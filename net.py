@@ -1,6 +1,5 @@
 #!usr/bin/env python
-from __future__ import print_function
-import os
+import numpy as np
 
 import chainer
 import chainer.functions as F
@@ -27,10 +26,11 @@ class Generator(chainer.Chain):
             g3 = L.Deconvolution2D(in_channel=1, out_channel=64, ksize=3, stride=stride, pad=1), # 13
             norm3 = L.BatchNormalization(64),
             g4 = L.Deconvolution2D(in_channel=64, out_channel=1, ksize=kernel_size, stride=stride), # 28
-
         )
+        self.z_dim = z_dim
 
-    def __call__(self, z):
+    def __call__(self):
+        z = np.random.uniform(size=(self.z_dim))
         h1 = F.relu(self.norm1(self.fc1(z)))
         h2_ = F.relu(self.norm2(self.fc2(h1)))
         h2 = F.reshape(h2_, (-1, 128, 7, 7))

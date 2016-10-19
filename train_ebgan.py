@@ -51,5 +51,8 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
     def updater_core(self, x):
         batch = self._iterators['main'].next()
         in_arrays = self.converter(batch, self.device)
+        fake_image = self.gan()
+        _data = F.concat((chainer.Variable(in_arrays), fake_image))
+        prediction = self.dis(_data)
 
-        
+        mse_dis = F.mean_squared_error(_data, prediction)
