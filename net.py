@@ -58,35 +58,34 @@ class Discriminator(chainer.Chain):
             fc4 = L.Linear(None, z_dim),
             norm4 = L.BatchNormalization(50),
 
-            fc5 = L.Linear(z_dim, 1024),
-            norm5 = L.BatchNormalization(1024),
-            fc6 = L.Linear(1024, 7*7*128),
-            norm6 = L.BatchNormalization(7*7*128),
-            g7 = L.Deconvolution2D(in_channels=128, out_channels=64, ksize=3, stride=stride, pad=1),
-            norm7 = L.BatchNormalization(64),
-            g8 = L.Deconvolution2D(in_channels=64, out_channels=1, ksize=kernel_size, stride=stride),
-
+            fc5 = L.Linear(z_dim, 13*13*64),
+            norm5 = L.BatchNormalization(13*13*64),
+            g6 = L.Deconvolution2D(in_channels=64, out_channels=1, ksize=kernel_size, stride=stride),
         )
         self.z_dim = z_dim
 
     def __call__(self, x):
+        h1 = F.relu(self.norm1(self.d1(x)))
+        h2 = F.relu(self.norm2(self.d2(h1)))
+        h3 = F.relu(self.norm3(self.d3(h2)))
+        h4 = self.fc4(h3)
 
-        return self.generate(self.encode(x))
+        h5 = F.relu(self.norm5(self.fc5(h4)))
+        h5 = F.reshape(h5, (-1, 64, 13, 13))
+        h6 = F.sigmoid(self.g6(h5))
+
+        return h6
 
     def encode(self, x):
         h1 = F.relu(self.norm1(self.d1(x)))
         h2 = F.relu(self.norm2(self.d2(h1)))
         h3 = F.relu(self.norm3(self.d3(h2)))
+        h4 = self.fc4(h3)
+        return h4
 
-        return self.fc4(h3)
+    def generate(self, h4):
+        h5 = F.relu(self.norm5(self.fc5(h4)))
+        h5 = F.reshape(h5, (-1, 64, 13, 13))
+        h6 = F.sigmoid(self.g6(h5))
 
-    def generate(self, z):
-        h5 = F.relu(self.fc5(z))
-        h6 = F.relu(self.norm5(h5))
-        h6 = F.relu(self.fc6(h6))
-        h7 = F.relu(self.norm6(h6))
-        h7 = F.reshape(h7, (-1, 128, 7, 7))
-        h8 = F.relu(self.norm7(self.g7(h7)))
-        h9 = self.g8(h8)
-
-        return F.sigmoid(h9)
+        return h6

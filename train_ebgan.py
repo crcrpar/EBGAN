@@ -5,6 +5,7 @@ import argparse
 import os
 import six
 import numpy as np
+import collections
 
 import chainer
 import chainer.functions as F
@@ -81,9 +82,13 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         loss_dictionary = {'dis':loss_dis, 'gen':loss_gen}
         print('# loss_dictionary: ', loss_dictionary)
         for name, optimizer in six.iteritems(self._optimizers):
+            print('#'*30)
+            print(name)
+            print('#'*30)
             optimizer.target.cleargrads()
             loss_dictionary[name].backward()
-            print('#### name ', name)
+            print('#### name ', loss_dictionary[name].data)
+            print('#### name ', type(loss_dictionary[name]))
             optimizer.update()
 
 def main():
@@ -107,8 +112,8 @@ def main():
     opt_dis = chainer.optimizers.Adam()
     opt_gen.setup(generator)
     opt_dis.setup(discriminator)
-
-    optimizers = {'gen': opt_gen, 'dis': opt_dis}
+    optimizers = collections.OrderedDict()
+    optimizers = {'dis': opt_dis, 'gen': opt_gen}
 
     mnist, val = get_mnist(withlabel=False, ndim=3)
     train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
