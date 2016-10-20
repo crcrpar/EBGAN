@@ -57,7 +57,7 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         self._c = coeff
         self.converter = converter
         self.iteration = 0
-        self.device = device
+        self.device=device
         self.batch_size = batch_size
 
     def update_core(self):
@@ -103,9 +103,14 @@ def main():
     n_epoch = args.epoch
     latent_dim = args.latent_dim
     batch_size = args.batchsize
+    if args.gpu >= 0:
+        xp = cuda.cupy
 
     generator = net.Generator(batch_size=batch_size, z_dim = latent_dim)
     discriminator = net.Discriminator()
+    if args.gpu >= 0:
+        generator.to_gpu()
+        discriminator.to_gpu()
 
     opt_gen = chainer.optimizers.Adam()
     opt_dis = chainer.optimizers.Adam()
