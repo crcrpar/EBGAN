@@ -40,7 +40,9 @@ class Generator(chainer.Chain):
 
 
 class Discriminator(chainer.Chain):
-
+    # TODO: re-define network.
+    # NOTE: 2016/10/20
+    
     def __init__(self, in_channels=1, kernel_size=4, stride=2):
         super(Discriminator, self).__init__(
             d1 = L.Convolution2D(in_channel=in_channels, out_channel=64, ksize=kernel_size, stride=stride, pad=1), # 14
@@ -58,3 +60,6 @@ class Discriminator(chainer.Chain):
         h3 = F.leaky_relu(self.norm3(self.d3(h2)))
 
         return self.fc4(h3)
+
+    def encode(self, x):
+        h1 = F.laky_relu(self.norm1(self.d1(x)))
