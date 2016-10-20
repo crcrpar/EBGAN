@@ -6,12 +6,11 @@ import chainer.functions as F
 import chainer.links as L
 from chainer import initializers
 
-""" Convolution2D
+"""
+    Convolution2D
 h0 = (h + 2p - k) / s + 1
 w0 = (w + 2p - k) / s + 1
-"""
-
-""" Deconvolution2D
+    Deconvolution2D
 h0 = s(h-1) + k - 2p
 w0 = s(w-1) + k - 2p
 """
