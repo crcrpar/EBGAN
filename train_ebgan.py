@@ -11,12 +11,12 @@ import chainer.functions as F
 import chainer.links as L
 from chainer import cuda
 from chainer.datasets import get_mnist
-from chainer.training import trainer, extension
+from chainer.training import trainer, extension, extensions
 from chainer.dataset import convert
 from chainer.dataset import iterator as iterator_module
-from chainer.datasets import get_mnist()
+from chainer.datasets import get_mnist
 from chainer import optimizer as optimizer_module
-from chaienr import reporter
+from chainer import reporter
 
 import net
 
@@ -58,7 +58,7 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         self.converter = converter
         self.iteration = 0
         self.device = device
-        self.batch_size
+        self.batch_size = batch_size
 
     def updater_core(self, x):
         batch = self._iterators['main'].next()
@@ -87,6 +87,7 @@ def main():
     parser.add_argument('--epoch', '-e', type=int, default=100, help='learning epoch')
     parser.add_argument('--batchsize', '-b', type=int, default=50)
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
+    parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
 
 
     args = parser.parse_args()
@@ -94,7 +95,7 @@ def main():
     latent_dim = args.latent_dim
     batch_size = args.batchsize
 
-    generator = net.Generator(z_dim = latent_dim)
+    generator = net.Generator(batch_size=batch_size, z_dim = latent_dim)
     discriminator = net.Discriminator()
 
     opt_gen = chainer.optimizers.Adam()
@@ -102,11 +103,14 @@ def main():
     opt_gen.setup(generator)
     opt_dis.setup(discriminator)
 
+    optimizers = {'gen': opt_gen, 'dis': opt_dis}
+
     mnist, val = get_mnist(withlabel=False, ndim=3)
     train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
     val_iter = chainer.iterators.SerialIterator(val, batch_size)
-    updater = chainer.training.StandardUpdater()
-    trainer = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers, batch_size=batch_size)
+    updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers, batch_size=batch_size)
+
+    trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
 
     trainer.extend(extensions.snapshot(), trigger=(n_epoch, 'epoch'))
     trainer.extend(extensions.LogReport())
@@ -114,3 +118,11 @@ def main():
     trainer.extend(extensions.ProgressBar())
     trainer.extend(extensions.dump_graph('enc/loss', out_name='enc_loss.dot'))
     trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
+
+    trainer.extend(extensions.LogReport())
+    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
+
+    trainer.run()
+
+if __name__ == '__main__':
+    main()
