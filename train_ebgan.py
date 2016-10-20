@@ -21,6 +21,10 @@ from chainer import reporter
 
 import net
 
+"""
+REF: https://github.com/pfnet/chainer/issues/1786
+Unused params cause NoneType error
+"""
 
 def pt_regularizer(S, bs=None):
     """
@@ -68,19 +72,19 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         reconstructed_true = self.dis(chainer.Variable(in_arrays))
         reconstructed_false = self.dis(fake_image)
 
-        loss_gen = F.sqrt(F.mean_squared_error(reconstructed_false, fake_image)) + self._c * pt_regularizer(self.dis.encode(fake_image), bs=self.batch_size)
+        mse_false_rt = F.sqrt(F.mean_squared_error(reconstructed_false, fake_image)) loss_gen = mse_false + self._c * pt_regularizer(self.dis.encode(fake_image), bs=self.batch_size)
 
-        loss_dis_ = self.m - F.sqrt(F.mean_squared_error(reconstructed_false, fake_image))
+        mse_true_rt = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays)))
+
+        loss_dis_ = self.m - mse_false_rt
         if loss_dis_.data >= .0:
-            print('#loss_dis_.data: ', loss_dis_.data)
-            loss_dis = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays))) + loss_dis_
+            loss_dis = mse_true_rt + loss_dis_
         else:
-            loss_dis = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays)))
-
+            loss_dis = mse_true_rt
+        print('## dis loss: ', loss_dis.data)
         reporter.report({'dis/loss': loss_dis, 'gen/loss': loss_gen})
 
         loss_dictionary = {'dis':loss_dis, 'gen':loss_gen}
-        print('# loss_dictionary: ', loss_dictionary)
         for name, optimizer in six.iteritems(self._optimizers):
             optimizer.target.cleargrads()
             loss_dictionary[name].backward()
