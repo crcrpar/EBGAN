@@ -37,7 +37,7 @@ def pt_regularizer(S, bs=None):
     dotS = F.matmul(S, S, transa=False, transb=True)
     dotS = dotS * dotS
 
-    pt =  (F.sum(dotS / S2) - bs) / float(bs*(bs-1))
+    pt =  (F.sum(dotS / S2) - chainer.Variable(np.array(bs).astype(np.float32))) / float(bs*(bs-1))
 
     return pt
 
@@ -77,9 +77,11 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         reporter.report({'dis/loss': loss_dis, 'gen/loss': loss_gen})
 
         loss_dictionary = {'dis':loss_dis, 'gen':loss_gen}
-
+        print('# loss_dictionary: ', loss_dictionary)
         for name, optimizer in six.iteritems(self._optimizers):
             optimizer.target.cleargrads()
+            print('##name: {}\n'.format(name))
+            print('## loss: {}\n'.format(loss_dictionary[name].data))
             loss_dictionary[name].backward()
             optimizer.update()
 
