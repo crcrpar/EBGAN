@@ -60,10 +60,10 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         self.device = device
         self.batch_size = batch_size
 
-    def update_core(self, x):
+    def update_core(self):
         batch = self._iterators['main'].next()
         in_arrays = self.converter(batch, self.device)
-        fake_image = self.gan()
+        fake_image = self.gen()
 
         reconstructed_true = self.dis(chainer.Variable(in_arrays))
         reconstructed_false = self.dis(fake_image)
