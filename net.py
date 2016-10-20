@@ -20,25 +20,20 @@ class Generator(chainer.Chain):
 
     def __init__(self, batch_size=20, z_dim=50, kernel_size=4, stride=2):
         super(Generator, self).__init__(
-            fc1 = L.Linear(z_dim, 1024, initialW=W, bias=bias),
+            fc1 = L.Linear(z_dim, 1024),
             norm1 = L.BatchNormalization(1024),
-            fc2 = L.Linear(1024, 7*7*128, initialW=W, bias=bias),
+            fc2 = L.Linear(1024, 7*7*128),
             norm2 = L.BatchNormalization(6272),
-            g3 = L.Deconvolution2D(in_channels=128, out_channels=64, ksize=3, stride=stride, pad=1, initialW=W), # 13
+            g3 = L.Deconvolution2D(in_channels=128, out_channels=64, ksize=3, stride=stride, pad=1), # 13
             norm3 = L.BatchNormalization(64),
-            g4 = L.Deconvolution2D(in_channels=64, out_channels=1, ksize=kernel_size, stride=stride, initialW=W), # 28
+            g4 = L.Deconvolution2D(in_channels=64, out_channels=1, ksize=kernel_size, stride=stride), # 28
         )
         self.z_dim = z_dim
         self.batch_size = batch_size
-        W = initializers.HeNormal(1 / np.sqrt(2), np.float32)
-        bias = initializers.Zero(np.float32)
-
 
     def __call__(self):
         z = np.random.uniform(size=(self.batch_size, self.z_dim)).astype(np.float32)
-        #print('z.shape', z.shape)
         h1_ = self.fc1(z)
-        #print(h1_.data.shape)
         h1 = F.relu(self.norm1(h1_))
         h2_ = F.relu(self.norm2(self.fc2(h1)))
         h2 = F.reshape(h2_, (-1, 128, 7, 7))
@@ -48,16 +43,15 @@ class Generator(chainer.Chain):
 
 
 class Discriminator(chainer.Chain):
-    # TODO: re-define network.
-    # NOTE: 2016/10/20
+    # TODO: fix vanishing gradients.
 
     def __init__(self, z_dim = 50, in_channels=1, kernel_size=4, stride=2):
         super(Discriminator, self).__init__(
-            d1 = L.Convolution2D(in_channels=in_channels, out_channels=64, ksize=kernel_size, stride=stride, pad=1, initialW=W), # 14
+            d1 = L.Convolution2D(in_channels=in_channels, out_channels=64, ksize=kernel_size, stride=stride, pad=1), # 14
             norm1 = L.BatchNormalization(64),
-            d2 = L.Convolution2D(in_channels=64, out_channels=128, ksize=kernel_size, stride=stride, pad=1, initialW=W), # 7
+            d2 = L.Convolution2D(in_channels=64, out_channels=128, ksize=kernel_size, stride=stride, pad=1), # 7
             norm2 = L.BatchNormalization(128),
-            d3 = L.Convolution2D(in_channels=128, out_channels=64, ksize=kernel_size, stride=stride, pad=1, initialW=W),
+            d3 = L.Convolution2D(in_channels=128, out_channels=64, ksize=kernel_size, stride=stride, pad=1),
             norm3 = L.BatchNormalization(64),
             fc4 = L.Linear(None, z_dim),
             norm4 = L.BatchNormalization(50),
@@ -67,11 +61,9 @@ class Discriminator(chainer.Chain):
             g6 = L.Deconvolution2D(in_channels=64, out_channels=1, ksize=kernel_size, stride=stride),
         )
         self.z_dim = z_dim
-        W = initializers.HeNormal(1 / np.sqrt(2), np.float32)
-        bias = initializers.Zero(np.float32)
 
     def __call__(self, x):
-        h1 = F.relu(self.norm1(self.d1(x)))
+        h1 = F.relu(self.d1(x))
         h2 = F.relu(self.norm2(self.d2(h1)))
         h3 = F.relu(self.norm3(self.d3(h2)))
         h4 = self.fc4(h3)
