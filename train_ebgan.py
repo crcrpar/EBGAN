@@ -26,6 +26,7 @@ def pt_regularizer(S, bs=None):
     """
     Args:
         S (chainer.Variable): contain ndarray, whose shape is (batch_size, latent_dim)
+        bs (int): batch size.
     Returns:
         pt (chainer.Variable): scalar
     """
@@ -47,14 +48,12 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
     def __init__(self, iterator, generator, discriminator, optimizers, batch_size, margin=1.0, coeff=0.1, converter=convert.concat_examples, device=None):
         if isinstance(iterator, iterator_module.Iterator):
             iterator = {'main':iterator}
-
         self._iterators = iterator
         self._optimizers = optimizers
-
         self.gen = generator
         self.dis = discriminator
         self.m = chainer.Variable(np.array(margin).astype(np.float32))
-        self.zero = chainer.Variable(np.array(0.0).astype(np.float32))
+        self.zero = chainer.Variable(np.zeros(shape=(1)).astype(np.float32))
         self._c = coeff
         self.converter = converter
         self.iteration = 0
@@ -87,7 +86,7 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
             print('#'*30)
             optimizer.target.cleargrads()
             loss_dictionary[name].backward()
-            print('#### name ', loss_dictionary[name].data)
+            print('#### {}.data: {}'.format(name, loss_dictionary[name].data))
             print('#### name ', type(loss_dictionary[name]))
             optimizer.update()
 
@@ -98,7 +97,7 @@ def main():
     parser.add_argument('--batchsize', '-b', type=int, default=50)
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
-
+    parser.add_argument('--out', '-o', type=str, help='directory to save')
 
     args = parser.parse_args()
     n_epoch = args.epoch
