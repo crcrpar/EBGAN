@@ -72,7 +72,8 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         reconstructed_true = self.dis(chainer.Variable(in_arrays))
         reconstructed_false = self.dis(fake_image)
 
-        mse_false_rt = F.sqrt(F.mean_squared_error(reconstructed_false, fake_image)) loss_gen = mse_false + self._c * pt_regularizer(self.dis.encode(fake_image), bs=self.batch_size)
+        mse_false_rt = F.sqrt(F.mean_squared_error(reconstructed_false, fake_image))
+        loss_gen = mse_false_rt + self._c * pt_regularizer(self.dis.encode(fake_image), bs=self.batch_size)
 
         mse_true_rt = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays)))
 
