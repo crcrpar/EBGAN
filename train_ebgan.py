@@ -32,8 +32,6 @@ def pt_regularizer(S, bs=None):
     dotS = F.matmul(S, S, transa=False, transb=True)
     dotS = dotS * dotS
 
-    assert(S2.data.shape == dotS.data.shape)
-
     pt =  (F.sum(dotS / S2) - bs) / float(bs*(bs-1))
 
     return pt
