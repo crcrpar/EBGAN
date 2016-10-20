@@ -17,13 +17,13 @@ w0 = s(w-1) + k - 2p
 
 class Generator(chainer.Chain):
 
-    def __init__(self, batch_size, z_dim=50, kernel_size=4, stride=2):
+    def __init__(self, batch_size=20, z_dim=50, kernel_size=4, stride=2):
         super(Generator, self).__init__(
             fc1 = L.Linear(z_dim, 1024),
             norm1 = L.BatchNormalization(1024),
             fc2 = L.Linear(1024, 7*7*128),
-            norm2 = L.BatchNormalization(7*7*128),
-            g3 = L.Deconvolution2D(in_channels=1, out_channels=64, ksize=3, stride=stride, pad=1), # 13
+            norm2 = L.BatchNormalization(6272),
+            g3 = L.Deconvolution2D(in_channels=128, out_channels=64, ksize=3, stride=stride, pad=1), # 13
             norm3 = L.BatchNormalization(64),
             g4 = L.Deconvolution2D(in_channels=64, out_channels=1, ksize=kernel_size, stride=stride), # 28
         )
@@ -31,8 +31,11 @@ class Generator(chainer.Chain):
         self.batch_size = batch_size
 
     def __call__(self):
-        z = np.random.uniform(size=(self.batch_size, self.z_dim))
-        h1 = F.relu(self.norm1(self.fc1(z)))
+        z = np.random.uniform(size=(self.batch_size, self.z_dim)).astype(np.float32)
+        #print('z.shape', z.shape)
+        h1_ = self.fc1(z)
+        #print(h1_.data.shape)
+        h1 = F.relu(self.norm1(h1_))
         h2_ = F.relu(self.norm2(self.fc2(h1)))
         h2 = F.reshape(h2_, (-1, 128, 7, 7))
         h3 = F.relu(self.norm3(self.g3(h2)))
