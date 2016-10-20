@@ -63,7 +63,7 @@ class Discriminator(chainer.Chain):
         self.z_dim = z_dim
 
     def __call__(self, x):
-        h1 = F.relu(self.d1(x))
+        h1 = F.relu(self.norm1(self.d1(x)))
         h2 = F.relu(self.norm2(self.d2(h1)))
         h3 = F.relu(self.norm3(self.d3(h2)))
         h4 = self.fc4(h3)
