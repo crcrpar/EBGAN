@@ -20,6 +20,7 @@ from chaienr import reporter
 
 import net
 
+
 def pt_regularizer(S, bs=None):
     """
     Args:
@@ -42,7 +43,7 @@ def pt_regularizer(S, bs=None):
 
 class EBGAN_Updater(chainer.training.StandardUpdater):
 
-    def __init__(self, iterator, generator, discriminator, optimizers, coeff=0.1 converter=convert.concat_examples, device=None):
+    def __init__(self, iterator, generator, discriminator, optimizers, batch_size, margin=1.0, coeff=0.1, converter=convert.concat_examples, device=None):
         if isinstance(iterator, iterator_module.Iterator):
             iterator = {'main':iterator}
 
@@ -51,10 +52,13 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
 
         self.gen = generator
         self.dis = discriminator
+        self.m = chainer.Variable(np.array(margin).astype(np.float32))
+        self.zero = chainer.Variable(np.array(0.0).astype(np.float32))
         self._c = coeff
         self.converter = converter
         self.iteration = 0
         self.device = device
+        self.batch_size
 
     def updater_core(self, x):
         batch = self._iterators['main'].next()
@@ -63,9 +67,10 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
 
         reconstructed_true = self.dis(chainer.Variable(in_arrays))
         reconstructed_false = self.dis(fake_image)
-        loss_gen = F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_false - fake_image))) + pt_regularizer(self.enc(fake_image))
 
-        loss_dis = F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_true - chainer.Variable(in_arrays)))) + F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_false - fake_image)))
+        loss_gen = F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_false - fake_image))) + self._c * pt_regularizer(self.enc(fake_image), bs=self.batch_size)
+        loss_dis = F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_false - fake_image)))
+        loss_dis = F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_true - chainer.Variable(in_arrays)))) + F.maximum(self.zero, self.m - loss_dis)
 
         reporter.report({'dis/loss': loss_dis, 'gen/loss': loss_gen})
 
@@ -80,10 +85,32 @@ def main():
     parser = argparse.ArgumentParser(description='Train EBGAN on MNIST.')
     parser.add_argument('--latent_dim', '-l', type=int, default=20, help='dimension of latent space.')
     parser.add_argument('--epoch', '-e', type=int, default=100, help='learning epoch')
+    parser.add_argument('--batchsize', '-b', type=int, default=50)
+    parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
+
 
     args = parser.parse_args()
     n_epoch = args.epoch
     latent_dim = args.latent_dim
+    batch_size = args.batchsize
+
+    generator = net.Generator(z_dim = latent_dim)
+    discriminator = net.Discriminator()
+
+    opt_gen = chainer.optimizers.Adam()
+    opt_dis = chainer.optimizers.Adam()
+    opt_gen.setup(generator)
+    opt_dis.setup(discriminator)
 
     mnist, val = get_mnist(withlabel=False, ndim=3)
-    mnist, val = mnist
+    train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
+    val_iter = chainer.iterators.SerialIterator(val, batch_size)
+    updater = chainer.training.StandardUpdater()
+    trainer = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers, batch_size=batch_size)
+
+    trainer.extend(extensions.snapshot(), trigger=(n_epoch, 'epoch'))
+    trainer.extend(extensions.LogReport())
+    trainer.extend(extensions.PrintReport(['epoch', 'enc/loss', 'gen/loss']))
+    trainer.extend(extensions.ProgressBar())
+    trainer.extend(extensions.dump_graph('enc/loss', out_name='enc_loss.dot'))
+    trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
