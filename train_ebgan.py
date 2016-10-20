@@ -1,6 +1,7 @@
 #!usr/bin/env python
 
 from __future__ import print_function
+import argparse
 import os
 import six
 import numpy as np
@@ -13,6 +14,7 @@ from chainer.datasets import get_mnist
 from chainer.training import trainer, extension
 from chainer.dataset import convert
 from chainer.dataset import iterator as iterator_module
+from chainer.datasets import get_mnist()
 from chainer import optimizer as optimizer_module
 from chaienr import reporter
 
@@ -61,7 +63,7 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
 
         reconstructed_true = self.dis(chainer.Variable(in_arrays))
         reconstructed_false = self.dis(fake_image)
-        loss_gen = F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_false - fake_image)))
+        loss_gen = F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_false - fake_image))) + pt_regularizer(self.enc(fake_image))
 
         loss_dis = F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_true - chainer.Variable(in_arrays)))) + F.sqrt(F.sum(F.batch_l2_norm_squared(reconstructed_false - fake_image)))
 
@@ -74,4 +76,14 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
             loss_dictionary[name].backward()
             optimizer.update()
 
-            
+def main():
+    parser = argparse.ArgumentParser(description='Train EBGAN on MNIST.')
+    parser.add_argument('--latent_dim', '-l', type=int, default=20, help='dimension of latent space.')
+    parser.add_argument('--epoch', '-e', type=int, default=100, help='learning epoch')
+
+    args = parser.parse_args()
+    n_epoch = args.epoch
+    latent_dim = args.latent_dim
+
+    mnist, val = get_mnist(withlabel=False, ndim=3)
+    mnist, val = mnist
