@@ -88,6 +88,7 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         loss_dictionary = {'dis':loss_dis, 'gen':loss_gen}
         for name, optimizer in six.iteritems(self._optimizers):
             optimizer.target.cleargrads()
+            loss_dictionary[name].debug_print()
             loss_dictionary[name].backward()
             optimizer.update()
 
@@ -117,7 +118,6 @@ def main():
     opt_dis = chainer.optimizers.Adam()
     opt_gen.setup(generator)
     opt_dis.setup(discriminator)
-    optimizers = collections.OrderedDict()
     optimizers = {'dis': opt_dis, 'gen': opt_gen}
 
     mnist, val = get_mnist(withlabel=False, ndim=3)
@@ -126,7 +126,7 @@ def main():
     updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers, batch_size=batch_size)
 
     trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
-
+    print('# num epoch: ', n_epoch, '\n')
     trainer.extend(extensions.snapshot(), trigger=(n_epoch, 'epoch'))
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.PrintReport(['epoch', 'enc/loss', 'gen/loss']))
