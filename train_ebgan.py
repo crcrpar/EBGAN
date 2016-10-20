@@ -70,9 +70,11 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
 
         loss_gen = F.sqrt(F.mean_squared_error(reconstructed_false, fake_image)) + self._c * pt_regularizer(self.dis.encode(fake_image), bs=self.batch_size)
 
-        loss_dis = F.sqrt(F.mean_squared_error(reconstructed_false, fake_image))
-
-        lossd_dis = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays))) + F.maximum(self.zero, self.m - loss_dis)
+        loss_dis_ = self.m - F.sqrt(F.mean_squared_error(reconstructed_false, fake_image))
+        if loss_dis_.data >= .0:
+            loss_dis = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays))) + F.maximum(self.zero, loss_dis_)
+        else:
+            loss_dis = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays)))
 
         reporter.report({'dis/loss': loss_dis, 'gen/loss': loss_gen})
 
@@ -80,9 +82,8 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         print('# loss_dictionary: ', loss_dictionary)
         for name, optimizer in six.iteritems(self._optimizers):
             optimizer.target.cleargrads()
-            print('##name: {}\n'.format(name))
-            print('## loss: {}\n'.format(loss_dictionary[name].data))
             loss_dictionary[name].backward()
+            print('#### name ', name)
             optimizer.update()
 
 def main():
