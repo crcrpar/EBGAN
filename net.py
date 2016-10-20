@@ -49,7 +49,7 @@ class Discriminator(chainer.Chain):
 
     def __init__(self, z_dim = 50, in_channels=1, kernel_size=4, stride=2):
         super(Discriminator, self).__init__(
-            d1 = L.Convolution2D(in_channels=in_channels, out_channels=128, ksize=kernel_size, stride=2*stride), # 14
+            d1 = L.Convolution2D(in_channels=in_channels, out_channels=64, ksize=kernel_size, stride=stride, pad=1), # 14
             norm1 = L.BatchNormalization(64),
             d2 = L.Convolution2D(in_channels=64, out_channels=128, ksize=kernel_size, stride=stride, pad=1), # 7
             norm2 = L.BatchNormalization(128),
@@ -65,8 +65,8 @@ class Discriminator(chainer.Chain):
         self.z_dim = z_dim
 
     def __call__(self, x):
-        #h1 = F.relu(self.norm1(self.d1(x)))
-        h2 = F.relu(self.norm2(self.d1(x)))
+        h1 = F.relu(self.norm1(self.d1(x)))
+        h2 = F.relu(self.norm2(self.d2(h1)))
         h3 = F.relu(self.norm3(self.d3(h2)))
         h4 = self.fc4(h3)
 
