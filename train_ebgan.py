@@ -83,13 +83,11 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
             loss_dis = mse_true_rt + loss_dis_
         else:
             loss_dis = mse_true_rt
-        print('## dis loss: ', loss_dis.data)
         reporter.report({'dis/loss': loss_dis, 'gen/loss': loss_gen})
 
         loss_dictionary = {'dis':loss_dis, 'gen':loss_gen}
         for name, optimizer in six.iteritems(self._optimizers):
             optimizer.target.cleargrads()
-            loss_dictionary[name].debug_print()
             loss_dictionary[name].backward()
             optimizer.update()
 
@@ -127,7 +125,7 @@ def main():
     updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers, batch_size=batch_size)
 
     trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
-    print('# num epoch: ', n_epoch, '\n')
+    print('# num epoch: {}\n', n_epoch)
     trainer.extend(extensions.snapshot(), trigger=(n_epoch, 'epoch'))
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
