@@ -130,13 +130,13 @@ def main():
     print('# num epoch: ', n_epoch, '\n')
     trainer.extend(extensions.snapshot(), trigger=(n_epoch, 'epoch'))
     trainer.extend(extensions.LogReport())
-    trainer.extend(extensions.PrintReport(['epoch', 'enc/loss', 'gen/loss']))
+    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
     trainer.extend(extensions.ProgressBar())
-    #trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
     trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
-
+    trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
+    trainer.extend(extensions.ProgressBar())
 
     trainer.run()
 
