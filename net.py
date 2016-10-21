@@ -25,7 +25,7 @@ class Discriminator1(chainer.Chain):
             norm2 = L.BatchNormalization(32),
             fc3 = L.Linear(32*3*3, 50),
             fc4 = L.Linear(50, 32*3*3),
-            d5 = L.Deconvolution2D(32, 16, ksize=4, stride=3),
+            d5 = L.Deconvolution2D(32, 16, ksize=3, stride=stride),
             norm5 = L.BatchNormalization(16),
             d6 = L.Deconvolution2D(16, 1, ksize= 4, stride= 4, pad= 0),
         )
@@ -35,12 +35,9 @@ class Discriminator1(chainer.Chain):
         h2 = F.relu(self.norm2(self.d2(h1)))
         h3 = F.relu(self.fc3(h2))
         h4 = F.relu(self.fc4(h3))
-        print('# h4.data.shape: ', h4.data.shape)
-        h4 = F.reshape(h4, (-1, 32, 2, 2))
+        h4 = F.reshape(h4, (-1, 32, 3, 3))
         h5 = F.relu(self.norm5(self.d5(h4)))
-        print('# h5.data.shape: ', h5.data.shape)
         h6 = F.sigmoid(self.d6(h5))
-
 
         return h6
 
