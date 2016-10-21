@@ -4,16 +4,49 @@ import numpy as np
 import chainer
 import chainer.functions as F
 import chainer.links as L
+from chainer import initializers
 
 """
+    Convolution2D
 h0 = (h + 2p - k) / s + 1
 w0 = (w + 2p - k) / s + 1
-"""
-
-"""
+    Deconvolution2D
 h0 = s(h-1) + k - 2p
 w0 = s(w-1) + k - 2p
 """
+
+class Discriminator1(chainer.Chain):
+
+    def __init__(self, z_dim = 50, in_channel=1, kernel_size=4, stride=2):
+        super(Discriminator1, self).__init__(
+            d1 = L.Convolution2D(in_channels=in_channel, out_channels=16, ksize=kernel_size, stride=4), # 7
+            norm1 = L.BatchNormalization(16),
+            d2 = L.Convolution2D(in_channels=16, out_channels=32, ksize=3, stride=stride), # 2
+            norm2 = L.BatchNormalization(32),
+            fc3 = L.Linear(32*3*3, 50),
+            fc4 = L.Linear(50, 32*3*3),
+            d5 = L.Deconvolution2D(32, 16, ksize=3, stride=stride),
+            norm5 = L.BatchNormalization(16),
+            d6 = L.Deconvolution2D(16, 1, ksize= 4, stride= 4, pad= 0),
+        )
+
+    def __call__(self, x):
+        h1 = F.relu(self.norm1(self.d1(x)))
+        h2 = F.relu(self.norm2(self.d2(h1)))
+        h3 = F.relu(self.fc3(h2))
+        h4 = F.relu(self.fc4(h3))
+        h4 = F.reshape(h4, (-1, 32, 3, 3))
+        h5 = F.relu(self.norm5(self.d5(h4)))
+        h6 = F.sigmoid(self.d6(h5))
+
+        return h6
+
+    def encode(self, x):
+        h1 = F.relu(self.norm1(self.d1(x)))
+        h2 = F.relu(self.norm2(self.d2(h1)))
+        S = F.relu(self.fc3(h2))
+
+        return S
 
 class Generator(chainer.Chain):
 
@@ -32,9 +65,7 @@ class Generator(chainer.Chain):
 
     def __call__(self):
         z = np.random.uniform(size=(self.batch_size, self.z_dim)).astype(np.float32)
-        #print('z.shape', z.shape)
         h1_ = self.fc1(z)
-        #print(h1_.data.shape)
         h1 = F.relu(self.norm1(h1_))
         h2_ = F.relu(self.norm2(self.fc2(h1)))
         h2 = F.reshape(h2_, (-1, 128, 7, 7))
@@ -44,12 +75,11 @@ class Generator(chainer.Chain):
 
 
 class Discriminator(chainer.Chain):
-    # TODO: re-define network.
-    # NOTE: 2016/10/20
+    # TODO: fix vanishing gradients.
 
-    def __init__(self, z_dim = 50, in_channels=1, kernel_size=4, stride=2):
+    def __init__(self, z_dim = 50, in_channel=1, kernel_size=4, stride=2):
         super(Discriminator, self).__init__(
-            d1 = L.Convolution2D(in_channels=in_channels, out_channels=64, ksize=kernel_size, stride=stride, pad=1), # 14
+            d1 = L.Convolution2D(in_channels=in_channel, out_channels=64, ksize=kernel_size, stride=stride, pad=1), # 14
             norm1 = L.BatchNormalization(64),
             d2 = L.Convolution2D(in_channels=64, out_channels=128, ksize=kernel_size, stride=stride, pad=1), # 7
             norm2 = L.BatchNormalization(128),

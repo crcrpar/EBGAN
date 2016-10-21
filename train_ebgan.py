@@ -21,11 +21,16 @@ from chainer import reporter
 
 import net
 
+"""
+REF: https://github.com/pfnet/chainer/issues/1786
+Unused params cause NoneType error
+"""
 
 def pt_regularizer(S, bs=None):
     """
     Args:
         S (chainer.Variable): contain ndarray, whose shape is (batch_size, latent_dim)
+        bs (int): batch size.
     Returns:
         pt (chainer.Variable): scalar
     """
@@ -47,48 +52,45 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
     def __init__(self, iterator, generator, discriminator, optimizers, batch_size, margin=1.0, coeff=0.1, converter=convert.concat_examples, device=None):
         if isinstance(iterator, iterator_module.Iterator):
             iterator = {'main':iterator}
-
         self._iterators = iterator
         self._optimizers = optimizers
-
         self.gen = generator
         self.dis = discriminator
         self.m = chainer.Variable(np.array(margin).astype(np.float32))
-        self.zero = chainer.Variable(np.array(0.0).astype(np.float32))
+        self.zero = chainer.Variable(np.zeros(shape=(1)).astype(np.float32))
         self._c = coeff
         self.converter = converter
         self.iteration = 0
-        self.device = device
+        self.device=device
         self.batch_size = batch_size
 
     def update_core(self):
         batch = self._iterators['main'].next()
         in_arrays = self.converter(batch, self.device)
+
         fake_image = self.gen()
 
         reconstructed_true = self.dis(chainer.Variable(in_arrays))
         reconstructed_false = self.dis(fake_image)
 
-        loss_gen = F.sqrt(F.mean_squared_error(reconstructed_false, fake_image)) + self._c * pt_regularizer(self.dis.encode(fake_image), bs=self.batch_size)
+        mse_false_rt = F.sqrt(F.mean_squared_error(reconstructed_false, fake_image))
+        loss_gen = mse_false_rt + self._c * pt_regularizer(self.dis.encode(fake_image), bs=self.batch_size)
 
-        loss_dis_ = self.m - F.sqrt(F.mean_squared_error(reconstructed_false, fake_image))
+        mse_true_rt = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays)))
+
+        loss_dis_ = self.m - mse_false_rt
         if loss_dis_.data >= .0:
-            loss_dis = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays))) + F.maximum(self.zero, loss_dis_)
+            loss_dis = mse_true_rt + loss_dis_
         else:
-            loss_dis = F.sqrt(F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays)))
-
+            loss_dis = mse_true_rt
+        print('## dis loss: ', loss_dis.data)
         reporter.report({'dis/loss': loss_dis, 'gen/loss': loss_gen})
 
         loss_dictionary = {'dis':loss_dis, 'gen':loss_gen}
-        print('# loss_dictionary: ', loss_dictionary)
         for name, optimizer in six.iteritems(self._optimizers):
-            print('#'*30)
-            print(name)
-            print('#'*30)
             optimizer.target.cleargrads()
+            loss_dictionary[name].debug_print()
             loss_dictionary[name].backward()
-            print('#### name ', loss_dictionary[name].data)
-            print('#### name ', type(loss_dictionary[name]))
             optimizer.update()
 
 def main():
@@ -98,21 +100,25 @@ def main():
     parser.add_argument('--batchsize', '-b', type=int, default=50)
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
-
+    parser.add_argument('--out', '-o', type=str, help='directory to save')
 
     args = parser.parse_args()
     n_epoch = args.epoch
     latent_dim = args.latent_dim
     batch_size = args.batchsize
+    if args.gpu >= 0:
+        xp = cuda.cupy
 
     generator = net.Generator(batch_size=batch_size, z_dim = latent_dim)
-    discriminator = net.Discriminator()
+    discriminator = net.Discriminator1()
+    if args.gpu >= 0:
+        generator.to_gpu()
+        discriminator.to_gpu()
 
     opt_gen = chainer.optimizers.Adam()
     opt_dis = chainer.optimizers.Adam()
     opt_gen.setup(generator)
     opt_dis.setup(discriminator)
-    optimizers = collections.OrderedDict()
     optimizers = {'dis': opt_dis, 'gen': opt_gen}
 
     mnist, val = get_mnist(withlabel=False, ndim=3)
@@ -121,16 +127,16 @@ def main():
     updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers, batch_size=batch_size)
 
     trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
-
+    print('# num epoch: ', n_epoch, '\n')
     trainer.extend(extensions.snapshot(), trigger=(n_epoch, 'epoch'))
     trainer.extend(extensions.LogReport())
-    trainer.extend(extensions.PrintReport(['epoch', 'enc/loss', 'gen/loss']))
+    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
     trainer.extend(extensions.ProgressBar())
-    trainer.extend(extensions.dump_graph('enc/loss', out_name='enc_loss.dot'))
     trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
-
+    trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
+    trainer.extend(extensions.ProgressBar())
 
     trainer.run()
 
