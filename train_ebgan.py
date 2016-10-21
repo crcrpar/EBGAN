@@ -110,7 +110,7 @@ def main():
         xp = cuda.cupy
 
     generator = net.Generator(batch_size=batch_size, z_dim = latent_dim)
-    discriminator = net.Discriminator()
+    discriminator = net.Discriminator1()
     if args.gpu >= 0:
         generator.to_gpu()
         discriminator.to_gpu()
