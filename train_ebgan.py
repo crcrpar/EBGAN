@@ -132,7 +132,7 @@ def main():
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.PrintReport(['epoch', 'enc/loss', 'gen/loss']))
     trainer.extend(extensions.ProgressBar())
-    trainer.extend(extensions.dump_graph('enc/loss', out_name='enc_loss.dot'))
+    #trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
     trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
 
     trainer.extend(extensions.LogReport())
