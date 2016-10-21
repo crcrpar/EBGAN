@@ -5,7 +5,7 @@ import argparse
 import os
 import six
 import numpy as np
-import collections
+import datetime
 
 import chainer
 import chainer.functions as F
@@ -99,6 +99,7 @@ def main():
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
     parser.add_argument('--out', '-o', type=str, help='directory to save')
+    parser.add_argument('--loaderjob', '-l', type=int, help='loader job for parallel iterator')
 
     args = parser.parse_args()
     n_epoch = args.epoch
@@ -120,21 +121,26 @@ def main():
     optimizers = {'dis': opt_dis, 'gen': opt_gen}
 
     mnist, val = get_mnist(withlabel=False, ndim=3)
-    train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
-    val_iter = chainer.iterators.SerialIterator(val, batch_size)
+    if args.loaderjob:
+        train_iter = chainer.iterators.MultiprocessIterator(mnist, batch_size=args.batchsize, n_processes=args.loaderjob)
+        val_iter = chainer.iterators.MultiprocessIterator(val, batch_size=args.batchsize, n_processes=args.loaderjob)
+    else:
+        train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
+        val_iter = chainer.iterators.SerialIterator(val, batch_size)
     updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers, batch_size=batch_size)
 
+    log_name = datetime.datetime.now().strftime('%m_%d_%H_%M') + '_log.json'
     trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
-    print('# num epoch: {}\n', n_epoch)
-    trainer.extend(extensions.snapshot(), trigger=(n_epoch, 'epoch'))
-    trainer.extend(extensions.LogReport())
-    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
-    trainer.extend(extensions.ProgressBar())
+    print('# num epoch: {}\n'.format(n_epoch))
     trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
     trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
-    trainer.extend(extensions.LogReport())
+    trainer.extend(extensions.snapshot(), trigger=(n_epoch, 'epoch'))
+    trainer.extend(extensions.LogReport(log_name=log_name))
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
     trainer.extend(extensions.ProgressBar())
+
+    if args.resume:
+        chainer.serializers.load_npz(args.resume, trainer)
 
     trainer.run()
 
