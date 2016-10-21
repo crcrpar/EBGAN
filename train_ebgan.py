@@ -100,6 +100,7 @@ def main():
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
     parser.add_argument('--out', '-o', type=str, help='directory to save')
     parser.add_argument('--loaderjob', '-l', type=int, help='loader job for parallel iterator')
+    parser.add_argument('--interval', '-i', default=10, type=int, help='frequency of snapshot.')
 
     args = parser.parse_args()
     n_epoch = args.epoch
