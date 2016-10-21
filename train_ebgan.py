@@ -99,8 +99,8 @@ def main():
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
     parser.add_argument('--out', '-o', type=str, help='directory to save')
-    parser.add_argument('--loaderjob', '-l', type=int, help='loader job for parallel iterator')
-    parser.add_argument('--interval', '-i', default=10, type=int, help='frequency of snapshot.')
+    parser.add_argument('--loaderjob', type=int, help='loader job for parallel iterator')
+    parser.add_argument('--interval', '-i', default=10, type=int, help='frequency of snapshot. larger integer indicates less snapshots.')
 
     args = parser.parse_args()
     n_epoch = args.epoch
@@ -135,8 +135,8 @@ def main():
     print('# num epoch: {}\n'.format(n_epoch))
     trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
     trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
-    trainer.extend(extensions.snapshot(), trigger=(n_epoch, 'epoch'))
-    trainer.extend(extensions.LogReport(log_name=log_name))
+    trainer.extend(extensions.snapshot(), trigger=(args.interval, 'epoch'))
+    trainer.extend(extensions.LogReport(log_name=os.path.join(args.out, log_name)))
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
     trainer.extend(extensions.ProgressBar())
 
