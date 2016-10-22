@@ -1,8 +1,8 @@
+# [WORK IN PROGRESS]
+
 # Energy-Based Generative Adversarial Network
 ## Ref.
 Zhao, J., Mathieu, M., & LeCun, Y. (2016). Energy-based Generative Adversarial Network, 1–15. Retrieved from http://arxiv.org/abs/1609.03126
-
-### WORK IN PROGRESS
 
 ## 0. Environment
 - Python 3.5.2
