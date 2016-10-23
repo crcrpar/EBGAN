@@ -32,4 +32,3 @@ $$
 f_{\rm PT}(S) = \dfrac{1}{{\rm batch\_size}({\rm batch\_size}-1)} \sum_i \sum_{j \ne i} \left( \dfrac{S_i^{\top}S_j}{||S_i|| ||S_j||} \right)^2
 \end{eqnarray}
 $$
-*Note*: only for Generator
