@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 import argparse
+import copy
 import os
 import six
 import numpy as np
@@ -17,6 +18,7 @@ from chainer.dataset import convert
 from chainer.dataset import iterator as iterator_module
 from chainer.datasets import get_mnist
 from chainer import optimizer as optimizer_module
+from chainer import reporter as reporter_module
 from chainer import reporter
 
 import net
@@ -91,6 +93,75 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
             loss_dictionary[name].backward()
             optimizer.update()
 
+class EBGAN_Evaluator(chainer.extensin.Extension):
+
+    trigger=1, 'epoch'
+    default_name='validation'
+    priority=chainer.extension.PRIORITY_WRITER
+
+    def __init__(self, iterator, gen, dis, coeff=0.1, margin=1.0 converter=convert.concat_examples, device=None, eval_hook=None, eval_func=None):
+        if isinstance(iterator, iterator_module.Iterator):
+            iterator = {'main': iterator}
+        self._iterators = iterator
+        self._targets = {'gen':gen, 'dis':dis}
+
+        self.converter = converter
+        self.device = device
+        self.eval_hook=eval_hook
+        self.eval_func = eval_func
+        self.m = chainer.Variable(np.array(margin).astype(np.float32))
+        self.zero = chainer.Variable(np.zeros(shape=(1)).astype(np.float32))
+        self._c = coeff
+
+    def get_iterator(self, name):
+        return sefl._iterators['name']
+
+    def get_all_iterators(self):
+        return dict(self._iterators)
+
+    def get_target(self, name):
+        return self._targets[name]
+
+    def get_all_targets(self):
+        return dict(self._targets)
+
+    def evaluate(self):
+        iterator = self._iterators['main']
+        gen = self._targets['gen']
+        dis = self._targets['dis']
+
+        it = copy.copy(iterator)
+        summary = reporter_module.DictSummary()
+
+        for batch in it:
+            observation = {}
+            with reporter_module.report_score(observation):
+                in_arrays = self.converter(batch, self.device)
+                batch_size = in_arrays.shape[0]
+                fake_image = gen()
+
+                reconstructed_true = dis(chainer.Variable(in_arrays))
+                reconstructed_false = dis(fake_image)
+
+                mse_false_rt = F.mean_squared_error(reconstructed_false, fake_image)
+                loss_gen = mse_false_rt + self._c * pt_regularizer(.dis.encode(fake_image))
+
+                mse_true_rt = F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays))
+
+                loss_dis_ = self.m - mse_false_rt
+                if loss_dis_.data >= .0:
+                    loss_dis = mse_true_rt + loss_dis_
+                else:
+                    loss_dis = mse_true_rt
+
+                observation['dis/acc/loss'] = loss_dis
+                observation['gen/acc/loss'] = loss_gen
+
+            summary.add(observation)
+
+        return summary.compute_mean()
+
+
 def main():
     parser = argparse.ArgumentParser(description='Train EBGAN on MNIST.')
     parser.add_argument('--latent_dim', '-l', type=int, default=20, help='dimension of latent space.')
@@ -139,6 +210,8 @@ def main():
     trainer.extend(extensions.LogReport(log_name=log_name+'{iteration}'))
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
     trainer.extend(extensions.ProgressBar())
+
+    trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
 
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)
