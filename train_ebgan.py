@@ -93,13 +93,13 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
             loss_dictionary[name].backward()
             optimizer.update()
 
-class EBGAN_Evaluator(chainer.extensin.Extension):
+class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
 
     trigger=1, 'epoch'
     default_name='validation'
-    priority=chainer.extension.PRIORITY_WRITER
+    priority=chainer.training.extension.PRIORITY_WRITER
 
-    def __init__(self, iterator, gen, dis, coeff=0.1, margin=1.0 converter=convert.concat_examples, device=None, eval_hook=None, eval_func=None):
+    def __init__(self, iterator, gen, dis, coeff=0.1, margin=1.0,  converter=convert.concat_examples, device=None, eval_hook=None, eval_func=None):
         if isinstance(iterator, iterator_module.Iterator):
             iterator = {'main': iterator}
         self._iterators = iterator
@@ -135,7 +135,7 @@ class EBGAN_Evaluator(chainer.extensin.Extension):
 
         for batch in it:
             observation = {}
-            with reporter_module.report_score(observation):
+            with reporter_module.report_scope(observation):
                 in_arrays = self.converter(batch, self.device)
                 batch_size = in_arrays.shape[0]
                 fake_image = gen()
@@ -144,7 +144,7 @@ class EBGAN_Evaluator(chainer.extensin.Extension):
                 reconstructed_false = dis(fake_image)
 
                 mse_false_rt = F.mean_squared_error(reconstructed_false, fake_image)
-                loss_gen = mse_false_rt + self._c * pt_regularizer(.dis.encode(fake_image))
+                loss_gen = mse_false_rt + self._c * pt_regularizer(dis.encode(fake_image))
 
                 mse_true_rt = F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays))
 
@@ -166,12 +166,13 @@ def main():
     parser = argparse.ArgumentParser(description='Train EBGAN on MNIST.')
     parser.add_argument('--latent_dim', '-l', type=int, default=20, help='dimension of latent space.')
     parser.add_argument('--epoch', '-e', type=int, default=100, help='learning epoch')
-    parser.add_argument('--batchsize', '-b', type=int, default=50)
+    parser.add_argument('--batchsize', '-b', type=int, default=2    0)
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
     parser.add_argument('--out', '-o', type=str, help='directory to save')
     parser.add_argument('--loaderjob', type=int, help='loader job for parallel iterator')
     parser.add_argument('--interval', '-i', default=10, type=int, help='frequency of snapshot. larger integer indicates less snapshots.')
+    parser.add_argument('--test', type=int, default=-1, help='positive integer indicates debug mode.')
 
     args = parser.parse_args()
     n_epoch = args.epoch
@@ -193,6 +194,17 @@ def main():
     optimizers = {'dis': opt_dis, 'gen': opt_gen}
 
     mnist, val = get_mnist(withlabel=False, ndim=3)
+    if args.test > -1:
+        N = mnist.shape[0]
+        N = int(N / 100)
+        mnist = mnist[:N, :, :, :]
+        print('test\ndataset size: {}'.format(mnist.shape[0]))
+
+    train_ind = [1, 3, 5, 10, 2, 0, 13, 15, 17]
+    x_val_known = chainer.Variable(np.asarray(x_train[train_ind]), volatile='on')
+    test_ind = [3, 2, 1, 18, 4, 8, 11, 17, 61]
+    x_val = chainer.Variable(np.asarray(x_test[test_ind]), volatile='on')
+
     if args.loaderjob:
         train_iter = chainer.iterators.MultiprocessIterator(mnist, batch_size=args.batchsize, n_processes=args.loaderjob)
         val_iter = chainer.iterators.MultiprocessIterator(val, batch_size=args.batchsize, n_processes=args.loaderjob)
@@ -212,6 +224,7 @@ def main():
     trainer.extend(extensions.ProgressBar())
 
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
+
 
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)
