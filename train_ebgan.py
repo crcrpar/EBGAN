@@ -245,7 +245,7 @@ def main():
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, batchsize=batch_size, device=args.gpu))
 
     @training.make_extension(trigger=(1, 'epoch'))
-    def save_image(trainer):
+    def save_dis_image(trainer):
 
         def save_img(x, filename):
             fig, ax = plt.subplots(3, 3, figsize=(9, 9), dpi=100)
@@ -264,13 +264,27 @@ def main():
         if args.gpu > -1:
             known_reconstructed = cuda.to_cpu(known_reconstructed)
             unknown_reconstructed = cuda.to_cpu(unknown_reconstructed)
-        save_img(known_inputs, os.path.join(args.out, 'known_inputs_{}.png'.format(trainer.updater.epoch)))
-        save_img(unknown_inputs, os.path.join(args.out, 'unknown_inputs_{}.png'.format(trainer.updater.epoch)))
-        save_img(known_reconstructed, os.path.join(args.out, 'known_resconstructed_{}.png'.format(trainer.updater.epoch)))
-        save_img(unknown_reconstructed, os.path.join(args.out, 'unknown_reconstructed_{}.png'.format(trainer.updater.epoch)))
+        if not os.path.exists(os.path.join(args.out, 'epoch_'+str(trainer.updater.epoch))):
+            os.mkdir(os.path.join(args.out, 'epoch_'+str(trainer.updater.epoch)))
+        save_img(known_inputs, os.path.join(args.out,  'epoch_'+str(trainer.updater.epoch), 'known_inputs.png'))
+        save_img(unknown_inputs, os.path.join(args.out,  'epoch_'+str(trainer.updater.epoch), 'unknown_inputs.png'))
+        save_img(known_reconstructed, os.path.join(args.out,  'epoch_'+str(trainer.updater.epoch), 'known_resconstructed.png'))
+        save_img(unknown_reconstructed, os.path.join(args.out,  'epoch_'+str(trainer.updater.epoch), 'unknown_reconstructed.png'))
 
+    trainer.extend(save_dis_image)
 
-    trainer.extend(save_image)
+    @training.make_extension(trigger=(1, 'epoch'))
+    def save_gen_image(trainer):
+        generated = trainer.updater.gen(bs=100, train=False)
+        _, ax = plt.subplots(10, 10, sharex=True, sharey=True)
+        for i in range(10):
+            for j in range(10):
+                ax[i][j].imshow(imgs[i * 10 + j], 'gray')
+                ax[i][j].set_axis_off()
+        plt.savefig(os.path.join(args.out,  'epoch_'+str(trainer.updater.epoch), 'generated.png'), dpi=600)
+        plt.close('all')
+
+    trainer.extend(save_gen_image)
 
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)
