@@ -66,6 +66,10 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         self.device=device
         self.batch_size = batch_size
 
+    @property
+    def epoch(self):
+        return self._iterators['main'].epoch
+
     def update_core(self):
         batch = self._iterators['main'].next()
         in_arrays = self.converter(batch, self.device)
@@ -125,6 +129,10 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
     def get_all_targets(self):
         return dict(self._targets)
 
+    @property
+    def epoch(self):
+        return self._iterators['main'].epoch
+
     def evaluate(self):
         iterator = self._iterators['main']
         gen = self._targets['gen']
@@ -132,11 +140,7 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
 
         it = copy.copy(iterator)
         summary = reporter_module.DictSummary()
-        i = 0
         for batch in it:
-            if i == 0:
-                print("len(batch){}\n".format(len(batch)))
-                i += 10
             observation = {}
             with reporter_module.report_scope(observation):
                 in_arrays = self.converter(batch, self.device)
@@ -159,6 +163,9 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
 
                 observation['dis/acc/loss'] = loss_dis
                 observation['gen/acc/loss'] = loss_gen
+
+                del loss_dis
+                del loss_gen
 
             summary.add(observation)
 
@@ -214,10 +221,10 @@ def main():
 
     if args.loaderjob:
         train_iter = chainer.iterators.MultiprocessIterator(mnist, batch_size=args.batchsize, n_processes=args.loaderjob)
-        val_iter = chainer.iterators.MultiprocessIterator(val, batch_size=args.batchsize, n_processes=args.loaderjob)
+        val_iter = chainer.iterators.MultiprocessIterator(val, batch_size=args.batchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
     else:
         train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
-        val_iter = chainer.iterators.SerialIterator(val, batch_size)
+        val_iter = chainer.iterators.SerialIterator(val, batch_size, repeat=False, shuffle=False)
     updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers,batch_size=batch_size)
 
     log_name = datetime.datetime.now().strftime('%m_%d_%H_%M') + '_log.json'
@@ -227,8 +234,8 @@ def main():
         trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
         trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
         trainer.extend(extensions.snapshot())
-        trainer.extend(extensions.LogReport(log_name=log_name+'{iteration}'))
-    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
+    trainer.extend(extensions.LogReport(log_name=log_name+'{iteration}'))
+    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss', 'dis/acc/loss', 'gen/acc/loss']))
     trainer.extend(extensions.ProgressBar())
 
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
