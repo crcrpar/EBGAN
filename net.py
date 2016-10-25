@@ -64,7 +64,7 @@ class Generator(chainer.Chain):
         self.batch_size = batch_size
 
     def __call__(self):
-        z = xp.random.uniform(size=(self.batch_size, self.z_dim)).astype(np.float32)
+        z = np.random.uniform(size=(self.batch_size, self.z_dim)).astype(np.float32)
         h1_ = self.fc1(z)
         h1 = F.relu(self.norm1(h1_))
         h2_ = F.relu(self.norm2(self.fc2(h1)))
