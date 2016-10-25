@@ -77,7 +77,7 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
     def update_core(self):
         batch = self._iterators['main'].next()
         in_arrays = self.converter(batch, self.device)
-        in_arrays = chainer.Varibale(in_arrays)
+        in_arrays = chainer.Variable(in_arrays)
         fake_image = self.gen()
         dis_input = F.concat((in_arrays, fake_image), axis=0)
         dis_output = self.dis(dis_input)
