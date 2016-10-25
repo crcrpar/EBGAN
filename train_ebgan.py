@@ -7,6 +7,7 @@ import os
 import six
 import numpy as np
 import datetime
+from PIL import Image
 
 import chainer
 import chainer.functions as F
@@ -69,6 +70,9 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
     @property
     def epoch(self):
         return self._iterators['main'].epoch
+
+    #def save_image(self):
+
 
     def update_core(self):
         batch = self._iterators['main'].next()
@@ -239,6 +243,9 @@ def main():
     trainer.extend(extensions.ProgressBar())
 
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
+
+    '''@trainer.make_extensions(trigger=(1, 'epoch'))
+    def save_image(trainer):'''
 
 
     if args.resume:
