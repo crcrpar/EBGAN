@@ -8,11 +8,12 @@ import six
 import numpy as np
 import datetime
 from PIL import Image
+import matplotlib.pyplot as plt
 
 import chainer
 import chainer.functions as F
 import chainer.links as L
-from chainer import cuda
+from chainer import cuda, training
 from chainer.datasets import get_mnist
 from chainer.training import trainer, extension, extensions
 from chainer.dataset import convert
@@ -180,7 +181,7 @@ def main():
     parser.add_argument('--batchsize', '-b', type=int, default=20)
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
-    parser.add_argument('--out', '-o', type=str, help='directory to save')
+    parser.add_argument('--out', '-o', default='images/', type=str, help='directory to save')
     parser.add_argument('--loaderjob', type=int, help='loader job for parallel iterator')
     parser.add_argument('--interval', '-i', default=1, type=int, help='frequency of snapshot. larger integer indicates less snapshots.')
     parser.add_argument('--test', type=int, default=-1, help='positive integer indicates debug mode.')
@@ -191,6 +192,9 @@ def main():
     batch_size = args.batchsize
     if args.gpu >= 0:
         xp = cuda.cupy
+
+    if not os.path.exists(args.out):
+        os.mkdir(args.out)
 
     generator = net.Generator(batch_size=batch_size, z_dim = latent_dim)
     discriminator = net.Discriminator1()
@@ -242,14 +246,16 @@ def main():
 
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
 
-    @trainer.make_extensions(trigger=(1, 'epoch'))
+    @training.make_extension(trigger=(1, 'epoch'))
     def save_image(trainer):
 
         def save_img(x, filename):
             fig, ax = plt.subplots(3, 3, figsize=(9, 9), dpi=100)
             for ai, xi in zip(ax.flatten(), x):
-                ai.imshow(xi[0].reshape(28, 28))
+                ai.imshow(xi)
             fig.savefig(filename)
+            plt.cla()
+            del fig, ax
         train_ind = [1, 3, 5, 10, 2, 0, 13, 15, 17]
         test_ind = [3, 2, 1, 18, 4, 8, 11, 17, 61]
         # number of inputs are 9
@@ -257,18 +263,12 @@ def main():
         unknown_inputs = val[test_ind]
         known_reconstructed = trainer.updater.dis(chainer.Variable(known_inputs)).data
         unknown_reconstructed = trainer.updater.dis(chainer.Variable(unknown_inputs)).data
-        save_img(known_inputs, os.path.join(args.out, 'known_inputs.png'))
-        save_img(unknown_inputs, os.path.join(args.out, 'unknown_inputs.png'))
-        save_img(known_reconstructed, os.path.join(args.out, 'known_resconstructed.png'))
-        save_img(unknown_reconstructed, os.path.join(args.out, 'unknown_reconstructed.png'))
+        save_img(known_inputs, os.path.join(args.out, 'known_inputs_{}.png'.format(trainer.updater.epoch)))
+        save_img(unknown_inputs, os.path.join(args.out, 'unknown_inputs_{}.png'.format(trainer.updater.epoch)))
+        save_img(known_reconstructed, os.path.join(args.out, 'known_resconstructed_{}.png'.format(trainer.updater.epoch)))
+        save_img(unknown_reconstructed, os.path.join(args.out, 'unknown_reconstructed_{}.png'.format(trainer.updater.epoch)))
 
-        '''known = ((known_reconstructed+1)*127.5).clip(0, 255).astype(np.uint8)
-        known = known.reshape((3, 3, 1, 28, 28)).transpose((0, 3, 1, 4, 2)).reshape((3*28, 3*28, 1))
-        Image.fromarray(known).save('{0}/{1:03d}_known.png'.format(args.out, trainer.updater.epoch))
-
-        unknown = ((unknown_reconstructed+1)*127.5).clip(0, 255).astype(np.uint8)
-        unknown = unknown.reshape((3, 3, 1, 28, 28)).clip(0, 255).astype(np.uint8)
-        Image.fromarray(unknown).save('{0}/{1:03d}_unknown.png'.format((args.out, trainer.updater.epoch)))'''
+        del known_inputs, known_reconstructed, unknown_inputs, unknown_reconstructed
 
     trainer.extend(save_image)
 
