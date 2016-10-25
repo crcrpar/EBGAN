@@ -161,8 +161,8 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
                 else:
                     loss_dis = mse_true_rt
 
-                observation['dis/acc/loss'] = loss_dis
-                observation['gen/acc/loss'] = loss_gen
+                observation['dis/val/loss'] = loss_dis
+                observation['gen/val/loss'] = loss_gen
 
                 del loss_dis
                 del loss_gen
@@ -235,7 +235,7 @@ def main():
         trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
         trainer.extend(extensions.snapshot())
     trainer.extend(extensions.LogReport(log_name=log_name+'{epoch}'))
-    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss', 'dis/acc/loss', 'gen/acc/loss']))
+    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss', 'dis/val/loss', 'gen/val/loss']))
     trainer.extend(extensions.ProgressBar())
 
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
