@@ -77,16 +77,16 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
     def update_core(self):
         batch = self._iterators['main'].next()
         in_arrays = self.converter(batch, self.device)
-
+        in_arrays = chainer.Varibale(in_arrays)
         fake_image = self.gen()
-
-        reconstructed_true = self.dis(chainer.Variable(in_arrays))
-        reconstructed_false = self.dis(fake_image)
+        dis_input = F.concat(in_arrays, fake_image), axis=0)
+        dis_output = self.dis(dis_input)
+        (reconstructed_true, reconstructed_false) = F.split_axis(dis_output, 2, axis=0)[0]
 
         mse_false_rt = F.mean_squared_error(reconstructed_false, fake_image)
         loss_gen = mse_false_rt + self._c * pt_regularizer(self.dis.encode(fake_image), bs=self.batch_size)
 
-        mse_true_rt = F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays))
+        mse_true_rt = F.mean_squared_error(reconstructed_true, in_arrays)
 
         loss_dis_ = self.m - mse_false_rt
         if loss_dis_.data >= .0:
@@ -185,7 +185,7 @@ def main():
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
     parser.add_argument('--out', '-o', type=str, help='directory to save')
     parser.add_argument('--loaderjob', type=int, help='loader job for parallel iterator')
-    parser.add_argument('--interval', '-i', default=10, type=int, help='frequency of snapshot. larger integer indicates less snapshots.')
+    parser.add_argument('--interval', '-i', default=1, type=int, help='frequency of snapshot. larger integer indicates less snapshots.')
     parser.add_argument('--test', type=int, default=-1, help='positive integer indicates debug mode.')
 
     args = parser.parse_args()
@@ -229,6 +229,7 @@ def main():
     else:
         train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
         val_iter = chainer.iterators.SerialIterator(val, batch_size, repeat=False, shuffle=False)
+        # repeat & shuffle might make learning slower
     updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers,batch_size=batch_size)
 
     log_name = datetime.datetime.now().strftime('%H_%M_epoch')
@@ -244,9 +245,19 @@ def main():
 
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
 
-    '''@trainer.make_extensions(trigger=(1, 'epoch'))
-    def save_image(trainer):'''
+    '''
+    @trainer.make_extensions(trigger=(1, 'epoch'))
+    def save_image(trainer):
+        train_ind = [1, 3, 5, 10, 2, 0, 13, 15, 17]
+        test_ind = [3, 2, 1, 18, 4, 8, 11, 17, 61]
+        # number of inputs are 9
+        known_inputs = mnist[train_ind]
+        unknown_inputs = val[test_ind]
+        known_reconstructed = trainer.updater.dis(chainer.Variable(known_inputs)).data
+        unknown_reconstructed = trainer.updater.dis(chainer.Variable(unknown_inputs)).data
 
+        known = ((known_reconstructed+1).127.5).clip(0, 255).astype(np.uint8)
+        known = known.reshape((3, 3, ))'''
 
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)
