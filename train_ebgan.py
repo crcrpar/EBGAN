@@ -79,7 +79,7 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         in_arrays = self.converter(batch, self.device)
         in_arrays = chainer.Varibale(in_arrays)
         fake_image = self.gen()
-        dis_input = F.concat(in_arrays, fake_image), axis=0)
+        dis_input = F.concat((in_arrays, fake_image), axis=0)
         dis_output = self.dis(dis_input)
         (reconstructed_true, reconstructed_false) = F.split_axis(dis_output, 2, axis=0)
 
