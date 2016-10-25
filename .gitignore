@@ -16,3 +16,5 @@ result/
 split_test.ipynb
 
 .ipynb_checkpoints/split_test-checkpoint.ipynb
+
+images/
