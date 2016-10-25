@@ -131,6 +131,7 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
         dis = self._targets['dis']
 
         it = copy.copy(iterator)
+        print(it)
         summary = reporter_module.DictSummary()
 
         for batch in it:
@@ -166,7 +167,7 @@ def main():
     parser = argparse.ArgumentParser(description='Train EBGAN on MNIST.')
     parser.add_argument('--latent_dim', '-l', type=int, default=20, help='dimension of latent space.')
     parser.add_argument('--epoch', '-e', type=int, default=100, help='learning epoch')
-    parser.add_argument('--batchsize', '-b', type=int, default=2    0)
+    parser.add_argument('--batchsize', '-b', type=int, default=20)
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
     parser.add_argument('--out', '-o', type=str, help='directory to save')
@@ -201,9 +202,9 @@ def main():
         print('test\ndataset size: {}'.format(mnist.shape[0]))
 
     train_ind = [1, 3, 5, 10, 2, 0, 13, 15, 17]
-    x_val_known = chainer.Variable(np.asarray(x_train[train_ind]), volatile='on')
+    x_val_known = chainer.Variable(np.asarray(mnist[train_ind]), volatile='on')
     test_ind = [3, 2, 1, 18, 4, 8, 11, 17, 61]
-    x_val = chainer.Variable(np.asarray(x_test[test_ind]), volatile='on')
+    x_val = chainer.Variable(np.asarray(val[test_ind]), volatile='on')
 
     if args.loaderjob:
         train_iter = chainer.iterators.MultiprocessIterator(mnist, batch_size=args.batchsize, n_processes=args.loaderjob)
@@ -211,7 +212,7 @@ def main():
     else:
         train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
         val_iter = chainer.iterators.SerialIterator(val, batch_size)
-    updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers, batch_size=batch_size)
+    updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers,batch_size=batch_size)
 
     log_name = datetime.datetime.now().strftime('%m_%d_%H_%M') + '_log.json'
     trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
