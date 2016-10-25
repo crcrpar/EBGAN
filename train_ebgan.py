@@ -231,13 +231,13 @@ def main():
         val_iter = chainer.iterators.SerialIterator(val, batch_size, repeat=False, shuffle=False)
     updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers,batch_size=batch_size)
 
-    log_name = datetime.datetime.now().strftime('%m_%d_%H_%M_')
+    log_name = datetime.datetime.now().strftime('%H_%M_epoch')
     trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
     print('# num epoch: {}\n'.format(n_epoch))
     if not args.test > -1:
         trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
         trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
-        trainer.extend(extensions.snapshot(filename=log_name+'{epoch}'))
+        trainer.extend(extensions.snapshot(filename='snapshot_epoch_'+'{epoch}'))
     trainer.extend(extensions.LogReport(log_name=log_name+'{epoch}'+'_log.json'))
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss', 'dis/val/loss', 'gen/val/loss']))
     trainer.extend(extensions.ProgressBar())
