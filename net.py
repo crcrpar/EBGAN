@@ -16,6 +16,7 @@ w0 = s(w-1) + k - 2p
 """
 
 class Discriminator1(chainer.Chain):
+    # working network
 
     def __init__(self, z_dim = 50, in_channel=1, kernel_size=4, stride=2):
         super(Discriminator1, self).__init__(

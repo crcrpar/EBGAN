@@ -7,11 +7,13 @@ import os
 import six
 import numpy as np
 import datetime
+from PIL import Image
+import matplotlib.pyplot as plt
 
 import chainer
 import chainer.functions as F
 import chainer.links as L
-from chainer import cuda
+from chainer import cuda, training
 from chainer.datasets import get_mnist
 from chainer.training import trainer, extension, extensions
 from chainer.dataset import convert
@@ -66,19 +68,23 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         self.device=device
         self.batch_size = batch_size
 
+    @property
+    def epoch(self):
+        return self._iterators['main'].epoch
+
     def update_core(self):
         batch = self._iterators['main'].next()
         in_arrays = self.converter(batch, self.device)
-
+        in_arrays = chainer.Variable(in_arrays)
         fake_image = self.gen()
-
-        reconstructed_true = self.dis(chainer.Variable(in_arrays))
-        reconstructed_false = self.dis(fake_image)
+        dis_input = F.concat((in_arrays, fake_image), axis=0)
+        dis_output = self.dis(dis_input)
+        (reconstructed_true, reconstructed_false) = F.split_axis(dis_output, 2, axis=0)
 
         mse_false_rt = F.mean_squared_error(reconstructed_false, fake_image)
         loss_gen = mse_false_rt + self._c * pt_regularizer(self.dis.encode(fake_image), bs=self.batch_size)
 
-        mse_true_rt = F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays))
+        mse_true_rt = F.mean_squared_error(reconstructed_true, in_arrays)
 
         loss_dis_ = self.m - mse_false_rt
         if loss_dis_.data >= .0:
@@ -125,15 +131,17 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
     def get_all_targets(self):
         return dict(self._targets)
 
+    @property
+    def epoch(self):
+        return self._iterators['main'].epoch
+
     def evaluate(self):
         iterator = self._iterators['main']
         gen = self._targets['gen']
         dis = self._targets['dis']
 
         it = copy.copy(iterator)
-        print(it)
         summary = reporter_module.DictSummary()
-
         for batch in it:
             observation = {}
             with reporter_module.report_scope(observation):
@@ -155,8 +163,11 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
                 else:
                     loss_dis = mse_true_rt
 
-                observation['dis/acc/loss'] = loss_dis
-                observation['gen/acc/loss'] = loss_gen
+                observation['dis/val/loss'] = loss_dis
+                observation['gen/val/loss'] = loss_gen
+
+                del loss_dis
+                del loss_gen
 
             summary.add(observation)
 
@@ -170,9 +181,9 @@ def main():
     parser.add_argument('--batchsize', '-b', type=int, default=20)
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
-    parser.add_argument('--out', '-o', type=str, help='directory to save')
+    parser.add_argument('--out', '-o', default='images/', type=str, help='directory to save')
     parser.add_argument('--loaderjob', type=int, help='loader job for parallel iterator')
-    parser.add_argument('--interval', '-i', default=10, type=int, help='frequency of snapshot. larger integer indicates less snapshots.')
+    parser.add_argument('--interval', '-i', default=1, type=int, help='frequency of snapshot. larger integer indicates less snapshots.')
     parser.add_argument('--test', type=int, default=-1, help='positive integer indicates debug mode.')
 
     args = parser.parse_args()
@@ -181,6 +192,9 @@ def main():
     batch_size = args.batchsize
     if args.gpu >= 0:
         xp = cuda.cupy
+
+    if not os.path.exists(args.out):
+        os.mkdir(args.out)
 
     generator = net.Generator(batch_size=batch_size, z_dim = latent_dim)
     discriminator = net.Discriminator1()
@@ -199,7 +213,11 @@ def main():
         N = mnist.shape[0]
         N = int(N / 100)
         mnist = mnist[:N, :, :, :]
-        print('test\ndataset size: {}'.format(mnist.shape[0]))
+        print('###test###\n#dataset size: {}'.format(N))
+        N = val.shape[0]
+        N = int(N / 100)
+        val = val[:N, :,:,:]
+        print('#validation set: {}\n'.format(N))
 
     train_ind = [1, 3, 5, 10, 2, 0, 13, 15, 17]
     x_val_known = chainer.Variable(np.asarray(mnist[train_ind]), volatile='on')
@@ -208,24 +226,51 @@ def main():
 
     if args.loaderjob:
         train_iter = chainer.iterators.MultiprocessIterator(mnist, batch_size=args.batchsize, n_processes=args.loaderjob)
-        val_iter = chainer.iterators.MultiprocessIterator(val, batch_size=args.batchsize, n_processes=args.loaderjob)
+        val_iter = chainer.iterators.MultiprocessIterator(val, batch_size=args.batchsize, n_processes=args.loaderjob, repeat=False, shuffle=False)
     else:
         train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
-        val_iter = chainer.iterators.SerialIterator(val, batch_size)
+        val_iter = chainer.iterators.SerialIterator(val, batch_size, repeat=False, shuffle=False)
+        # repeat & shuffle might make learning slower
     updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers,batch_size=batch_size)
 
-    log_name = datetime.datetime.now().strftime('%m_%d_%H_%M') + '_log.json'
+    log_name = datetime.datetime.now().strftime('%H_%M_epoch')
     trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
     print('# num epoch: {}\n'.format(n_epoch))
-    trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
-    trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
-    trainer.extend(extensions.snapshot())
-    trainer.extend(extensions.LogReport(log_name=log_name+'{iteration}'))
-    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
+    if args.test == -1:
+        trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
+        trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
+    trainer.extend(extensions.snapshot(filename='snapshot_epoch_{.updater.epoch}'))
+    trainer.extend(extensions.LogReport(log_name='log_'+'{epoch}'+'.json'))
+    trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss', 'dis/val/loss', 'gen/val/loss']))
     trainer.extend(extensions.ProgressBar())
 
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
 
+    @training.make_extension(trigger=(1, 'epoch'))
+    def save_image(trainer):
+
+        def save_img(x, filename):
+            fig, ax = plt.subplots(3, 3, figsize=(9, 9), dpi=100)
+            for ai, xi in zip(ax.flatten(), x):
+                ai.imshow(xi[0])
+            fig.savefig(filename)
+            plt.close('all')
+
+        train_ind = [1, 3, 5, 10, 2, 0, 13, 15, 17]
+        test_ind = [3, 2, 1, 18, 4, 8, 11, 17, 61]
+        # number of inputs are 9
+        known_inputs = mnist[train_ind]
+        unknown_inputs = val[test_ind]
+        known_reconstructed = trainer.updater.dis(chainer.Variable(known_inputs)).data
+        unknown_reconstructed = trainer.updater.dis(chainer.Variable(unknown_inputs)).data
+        save_img(known_inputs, os.path.join(args.out, 'known_inputs_{}.png'.format(trainer.updater.epoch)))
+        save_img(unknown_inputs, os.path.join(args.out, 'unknown_inputs_{}.png'.format(trainer.updater.epoch)))
+        save_img(known_reconstructed, os.path.join(args.out, 'known_resconstructed_{}.png'.format(trainer.updater.epoch)))
+        save_img(unknown_reconstructed, os.path.join(args.out, 'unknown_reconstructed_{}.png'.format(trainer.updater.epoch)))
+
+        del known_inputs, known_reconstructed, unknown_inputs, unknown_reconstructed
+
+    trainer.extend(save_image)
 
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)
