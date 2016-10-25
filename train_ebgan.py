@@ -1,5 +1,4 @@
 #!usr/bin/env python
-
 from __future__ import print_function
 import argparse
 import copy
@@ -12,15 +11,13 @@ import matplotlib.pyplot as plt
 import chainer
 import chainer.functions as F
 import chainer.links as L
-from chainer import cuda, training
+from chainer import cuda, training, reporter
 from chainer.datasets import get_mnist
-from chainer.training import trainer, extension, extensions
+from chainer.training import trainer, extensions
 from chainer.dataset import convert
 from chainer.dataset import iterator as iterator_module
 from chainer.datasets import get_mnist
 from chainer import optimizer as optimizer_module
-from chainer import reporter as reporter_module
-from chainer import reporter
 
 import net
 
@@ -142,10 +139,10 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
         dis = self._targets['dis']
 
         it = copy.copy(iterator)
-        summary = reporter_module.DictSummary()
+        summary = reporter.DictSummary()
         for batch in it:
             observation = {}
-            with reporter_module.report_scope(observation):
+            with reporter.report_scope(observation):
                 in_arrays = self.converter(batch, self.device)
                 batch_size = in_arrays.shape[0]
                 fake_image = gen(train=False)
