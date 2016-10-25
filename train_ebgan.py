@@ -71,9 +71,6 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
     def epoch(self):
         return self._iterators['main'].epoch
 
-    #def save_image(self):
-
-
     def update_core(self):
         batch = self._iterators['main'].next()
         in_arrays = self.converter(batch, self.device)
@@ -245,9 +242,14 @@ def main():
 
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
 
-    '''
     @trainer.make_extensions(trigger=(1, 'epoch'))
     def save_image(trainer):
+
+        def save_img(x, filename):
+            fig, ax = plt.subplots(3, 3, figsize=(9, 9), dpi=100)
+            for ai, xi in zip(ax.flatten(), x):
+                ai.imshow(xi[0].reshape(28, 28))
+            fig.savefig(filename)
         train_ind = [1, 3, 5, 10, 2, 0, 13, 15, 17]
         test_ind = [3, 2, 1, 18, 4, 8, 11, 17, 61]
         # number of inputs are 9
@@ -255,9 +257,20 @@ def main():
         unknown_inputs = val[test_ind]
         known_reconstructed = trainer.updater.dis(chainer.Variable(known_inputs)).data
         unknown_reconstructed = trainer.updater.dis(chainer.Variable(unknown_inputs)).data
+        save_img(known_inputs, os.path.join(args.out, 'known_inputs.png'))
+        save_img(unknown_inputs, os.path.join(args.out, 'unknown_inputs.png'))
+        save_img(known_reconstructed, os.path.join(args.out, 'known_resconstructed.png'))
+        save_img(unknown_reconstructed, os.path.join(args.out, 'unknown_reconstructed.png'))
 
-        known = ((known_reconstructed+1).127.5).clip(0, 255).astype(np.uint8)
-        known = known.reshape((3, 3, ))'''
+        '''known = ((known_reconstructed+1)*127.5).clip(0, 255).astype(np.uint8)
+        known = known.reshape((3, 3, 1, 28, 28)).transpose((0, 3, 1, 4, 2)).reshape((3*28, 3*28, 1))
+        Image.fromarray(known).save('{0}/{1:03d}_known.png'.format(args.out, trainer.updater.epoch))
+
+        unknown = ((unknown_reconstructed+1)*127.5).clip(0, 255).astype(np.uint8)
+        unknown = unknown.reshape((3, 3, 1, 28, 28)).clip(0, 255).astype(np.uint8)
+        Image.fromarray(unknown).save('{0}/{1:03d}_unknown.png'.format((args.out, trainer.updater.epoch)))'''
+
+    trainer.extend(save_image)
 
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)
