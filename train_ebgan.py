@@ -252,10 +252,10 @@ def main():
         def save_img(x, filename):
             fig, ax = plt.subplots(3, 3, figsize=(9, 9), dpi=100)
             for ai, xi in zip(ax.flatten(), x):
-                ai.imshow(xi)
+                ai.imshow(xi[0])
             fig.savefig(filename)
-            plt.cla()
-            del fig, ax
+            plt.close('all')
+
         train_ind = [1, 3, 5, 10, 2, 0, 13, 15, 17]
         test_ind = [3, 2, 1, 18, 4, 8, 11, 17, 61]
         # number of inputs are 9
