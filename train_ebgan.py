@@ -237,8 +237,8 @@ def main():
     if not args.test > -1:
         trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
         trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
-        trainer.extend(extensions.snapshot(filename='snapshot_epoch_'+'{epoch}'))
-    trainer.extend(extensions.LogReport(log_name=log_name+'{epoch}'+'_log.json'))
+        trainer.extend(extensions.snapshot(filename='snapshot_epoch_{.updater.epoch}'))
+    trainer.extend(extensions.LogReport(log_name='log_'+'{epoch}'+'.json'))
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss', 'dis/val/loss', 'gen/val/loss']))
     trainer.extend(extensions.ProgressBar())
 
