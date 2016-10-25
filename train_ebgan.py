@@ -91,10 +91,7 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
 
         loss_dis_ = self.m - mse_false_rt
         loss_dis = mse_true_rt + F.maximum(self.zero, loss_dis_)
-        '''if loss_dis_.data >= .0:
-            loss_dis = mse_true_rt + loss_dis_
-        else:
-            loss_dis = mse_true_rt'''
+
         reporter.report({'dis/loss': loss_dis, 'gen/loss': loss_gen})
 
         loss_dictionary = {'dis':loss_dis, 'gen':loss_gen}
@@ -119,8 +116,8 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
         self.device = device
         self.eval_hook=eval_hook
         self.eval_func = eval_func
-        self.m = chainer.Variable(np.array(margin).astype(np.float32))
-        self.zero = chainer.Variable(np.array(0.0).astype(np.float32))
+        self.m = chainer.Variable(np.array(margin).astype(np.float32), volatile='on')
+        self.zero = chainer.Variable(np.array(0.0).astype(np.float32), volatile='on')
         self._c = coeff
 
     def get_iterator(self, name):
@@ -163,10 +160,6 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
 
                 loss_dis_ = self.m - mse_false_rt
                 loss_dis = mse_true_rt + F.maximum(self.zero, loss_dis_)
-                '''if loss_dis_.data >= .0:
-                    loss_dis = mse_true_rt + loss_dis_
-                else:
-                    loss_dis = mse_true_rt'''
 
                 observation['dis/val/loss'] = loss_dis
                 observation['gen/val/loss'] = loss_gen
@@ -261,7 +254,6 @@ def main():
             fig, ax = plt.subplots(3, 3, figsize=(9, 9), dpi=100)
             for ai, xi in zip(ax.flatten(), x):
                 ai.imshow(xi[0])
-                ai.colorbar()
             fig.savefig(filename)
             plt.close('all')
 
