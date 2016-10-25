@@ -29,7 +29,7 @@ REF: https://github.com/pfnet/chainer/issues/1786
 Unused params cause NoneType error
 """
 
-def pt_regularizer(S, bs=None):
+def pt_regularizer(S, bs=None, train=True):
     """
     Args:
         S (chainer.Variable): contain ndarray, whose shape is (batch_size, latent_dim)
@@ -46,7 +46,11 @@ def pt_regularizer(S, bs=None):
     dotS = F.matmul(S, S, transa=False, transb=True)
     dotS = dotS * dotS
 
-    pt =  (F.sum(dotS / S2) - chainer.Variable(np.array(bs).astype(np.float32))) / float(bs*(bs-1))
+    if train:
+        pt =  (F.sum(dotS / S2) - chainer.Variable(np.array(bs).astype(np.float32))) / float(bs*(bs-1))
+
+    else:
+        pt =  (F.sum(dotS / S2) - chainer.Variable(np.array(bs).astype(np.float32), volatile='on')) / float(bs*(bs-1))
 
     return pt
 
@@ -60,7 +64,7 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         self.gen = generator
         self.dis = discriminator
         self.m = chainer.Variable(np.array(margin).astype(np.float32))
-        self.zero = chainer.Variable(np.zeros(shape=(1)).astype(np.float32))
+        self.zero = chainer.Variable(np.array(0.0).astype(np.float32))
         self._c = coeff
         self.converter = converter
         self.iteration = 0
@@ -86,10 +90,11 @@ class EBGAN_Updater(chainer.training.StandardUpdater):
         mse_true_rt = F.mean_squared_error(reconstructed_true, in_arrays)
 
         loss_dis_ = self.m - mse_false_rt
-        if loss_dis_.data >= .0:
+        loss_dis = mse_true_rt + F.maximum(self.zero, loss_dis_)
+        '''if loss_dis_.data >= .0:
             loss_dis = mse_true_rt + loss_dis_
         else:
-            loss_dis = mse_true_rt
+            loss_dis = mse_true_rt'''
         reporter.report({'dis/loss': loss_dis, 'gen/loss': loss_gen})
 
         loss_dictionary = {'dis':loss_dis, 'gen':loss_gen}
@@ -104,7 +109,7 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
     default_name='validation'
     priority=chainer.training.extension.PRIORITY_WRITER
 
-    def __init__(self, iterator, gen, dis, coeff=0.1, margin=1.0,  converter=convert.concat_examples, device=None, eval_hook=None, eval_func=None):
+    def __init__(self, iterator, gen, dis, batchsize, coeff=0.1, margin=1.0,  converter=convert.concat_examples, device=None, eval_hook=None, eval_func=None):
         if isinstance(iterator, iterator_module.Iterator):
             iterator = {'main': iterator}
         self._iterators = iterator
@@ -115,7 +120,7 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
         self.eval_hook=eval_hook
         self.eval_func = eval_func
         self.m = chainer.Variable(np.array(margin).astype(np.float32))
-        self.zero = chainer.Variable(np.zeros(shape=(1)).astype(np.float32))
+        self.zero = chainer.Variable(np.array(0.0).astype(np.float32))
         self._c = coeff
 
     def get_iterator(self, name):
@@ -146,21 +151,22 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
             with reporter_module.report_scope(observation):
                 in_arrays = self.converter(batch, self.device)
                 batch_size = in_arrays.shape[0]
-                fake_image = gen()
+                fake_image = gen(train=False)
 
                 reconstructed_true = dis(chainer.Variable(in_arrays, volatile='on'))
                 reconstructed_false = dis(fake_image)
 
                 mse_false_rt = F.mean_squared_error(reconstructed_false, fake_image)
-                loss_gen = mse_false_rt + self._c * pt_regularizer(dis.encode(fake_image))
+                loss_gen = mse_false_rt + self._c * pt_regularizer(dis.encode(fake_image), train=False)
 
-                mse_true_rt = F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays))
+                mse_true_rt = F.mean_squared_error(reconstructed_true, chainer.Variable(in_arrays, volatile='on'))
 
                 loss_dis_ = self.m - mse_false_rt
-                if loss_dis_.data >= .0:
+                loss_dis = mse_true_rt + F.maximum(self.zero, loss_dis_)
+                '''if loss_dis_.data >= .0:
                     loss_dis = mse_true_rt + loss_dis_
                 else:
-                    loss_dis = mse_true_rt
+                    loss_dis = mse_true_rt'''
 
                 observation['dis/val/loss'] = loss_dis
                 observation['gen/val/loss'] = loss_gen
@@ -212,7 +218,7 @@ def main():
         N = mnist.shape[0]
         N = int(N / 100)
         mnist = mnist[:N, :, :, :]
-        print('###test###\n#dataset size: {}'.format(N))
+        print('### DEBUG ###\n#dataset size: {}'.format(N))
         N = val.shape[0]
         N = int(N / 100)
         val = val[:N, :,:,:]
@@ -230,20 +236,23 @@ def main():
         train_iter = chainer.iterators.SerialIterator(mnist, batch_size)
         val_iter = chainer.iterators.SerialIterator(val, batch_size, repeat=False, shuffle=False)
         # repeat & shuffle might make learning slower
-    updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers,batch_size=batch_size)
+
+    updater = EBGAN_Updater(iterator=train_iter, generator=generator, discriminator=discriminator, optimizers=optimizers, batch_size=batch_size, device=args.gpu)
 
     log_name = datetime.datetime.now().strftime('%H_%M_epoch')
     trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
     print('# num epoch: {}\n'.format(n_epoch))
+
     if args.test == -1:
         trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
         trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
+
     trainer.extend(extensions.snapshot(filename='snapshot_epoch_{.updater.epoch}'))
     trainer.extend(extensions.LogReport(log_name='log_'+'{epoch}'+'.json'))
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss', 'dis/val/loss', 'gen/val/loss']))
     trainer.extend(extensions.ProgressBar())
 
-    trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, device=args.gpu))
+    trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, batchsize=batch_size, device=args.gpu))
 
     @training.make_extension(trigger=(1, 'epoch'))
     def save_image(trainer):
@@ -271,8 +280,6 @@ def main():
         save_img(known_reconstructed, os.path.join(args.out, 'known_resconstructed_{}.png'.format(trainer.updater.epoch)))
         save_img(unknown_reconstructed, os.path.join(args.out, 'unknown_reconstructed_{}.png'.format(trainer.updater.epoch)))
 
-
-        del known_inputs, known_reconstructed, unknown_inputs, unknown_reconstructed
 
     trainer.extend(save_image)
 
