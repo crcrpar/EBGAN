@@ -131,10 +131,12 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
         dis = self._targets['dis']
 
         it = copy.copy(iterator)
-        print(it)
         summary = reporter_module.DictSummary()
-
+        i = 0
         for batch in it:
+            if i == 0:
+                print("len(batch){}\n".format(len(batch)))
+                i += 10
             observation = {}
             with reporter_module.report_scope(observation):
                 in_arrays = self.converter(batch, self.device)
@@ -199,7 +201,11 @@ def main():
         N = mnist.shape[0]
         N = int(N / 100)
         mnist = mnist[:N, :, :, :]
-        print('test\ndataset size: {}'.format(mnist.shape[0]))
+        print('###test###\n#dataset size: {}'.format(N))
+        N = val.shape[0]
+        N = int(N / 100)
+        val = val[:N, :,:,:]
+        print('#validation set: {}\n'.format(N))
 
     train_ind = [1, 3, 5, 10, 2, 0, 13, 15, 17]
     x_val_known = chainer.Variable(np.asarray(mnist[train_ind]), volatile='on')
@@ -217,10 +223,11 @@ def main():
     log_name = datetime.datetime.now().strftime('%m_%d_%H_%M') + '_log.json'
     trainer = chainer.training.Trainer(updater, (n_epoch, 'epoch'))
     print('# num epoch: {}\n'.format(n_epoch))
-    trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
-    trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
-    trainer.extend(extensions.snapshot())
-    trainer.extend(extensions.LogReport(log_name=log_name+'{iteration}'))
+    if not args.test > -1:
+        trainer.extend(extensions.dump_graph('gen/loss', out_name='gen_loss.dot'))
+        trainer.extend(extensions.dump_graph('dis/loss', out_name='dis_loss.dot'))
+        trainer.extend(extensions.snapshot())
+        trainer.extend(extensions.LogReport(log_name=log_name+'{iteration}'))
     trainer.extend(extensions.PrintReport(['epoch', 'dis/loss', 'gen/loss']))
     trainer.extend(extensions.ProgressBar())
 
