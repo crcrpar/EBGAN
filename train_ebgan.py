@@ -149,7 +149,7 @@ class EBGAN_Evaluator(chainer.training.extensions.Evaluator):
                 batch_size = in_arrays.shape[0]
                 fake_image = gen()
 
-                reconstructed_true = dis(chainer.Variable(in_arrays))
+                reconstructed_true = dis(chainer.Variable(in_arrays, volatile='on'))
                 reconstructed_false = dis(fake_image)
 
                 mse_false_rt = F.mean_squared_error(reconstructed_false, fake_image)
@@ -181,7 +181,7 @@ def main():
     parser.add_argument('--batchsize', '-b', type=int, default=20)
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
-    parser.add_argument('--out', '-o', default='images/', type=str, help='directory to save')
+    parser.add_argument('--out', '-o', default='images/', type=str, help='directory to save images')
     parser.add_argument('--loaderjob', type=int, help='loader job for parallel iterator')
     parser.add_argument('--interval', '-i', default=1, type=int, help='frequency of snapshot. larger integer indicates less snapshots.')
     parser.add_argument('--test', type=int, default=-1, help='positive integer indicates debug mode.')
@@ -253,6 +253,7 @@ def main():
             fig, ax = plt.subplots(3, 3, figsize=(9, 9), dpi=100)
             for ai, xi in zip(ax.flatten(), x):
                 ai.imshow(xi[0])
+                ai.colorbar()
             fig.savefig(filename)
             plt.close('all')
 
@@ -261,12 +262,16 @@ def main():
         # number of inputs are 9
         known_inputs = mnist[train_ind]
         unknown_inputs = val[test_ind]
-        known_reconstructed = trainer.updater.dis(chainer.Variable(known_inputs)).data
-        unknown_reconstructed = trainer.updater.dis(chainer.Variable(unknown_inputs)).data
+        known_reconstructed = trainer.updater.dis(chainer.Variable(known_inputs, volatile='on')).data
+        unknown_reconstructed = trainer.updater.dis(chainer.Variable(unknown_inputs, volatile='on')).data
+        if args.gpu > -1:
+            known_reconstructed = cuda.to_cpu(known_reconstructed)
+            unknown_reconstructed = cuda.to_cpu(unknown_reconstructed)
         save_img(known_inputs, os.path.join(args.out, 'known_inputs_{}.png'.format(trainer.updater.epoch)))
         save_img(unknown_inputs, os.path.join(args.out, 'unknown_inputs_{}.png'.format(trainer.updater.epoch)))
         save_img(known_reconstructed, os.path.join(args.out, 'known_resconstructed_{}.png'.format(trainer.updater.epoch)))
         save_img(unknown_reconstructed, os.path.join(args.out, 'unknown_reconstructed_{}.png'.format(trainer.updater.epoch)))
+
 
         del known_inputs, known_reconstructed, unknown_inputs, unknown_reconstructed
 
