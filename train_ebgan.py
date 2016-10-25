@@ -7,7 +7,6 @@ import os
 import six
 import numpy as np
 import datetime
-from PIL import Image
 import matplotlib.pyplot as plt
 
 import chainer
