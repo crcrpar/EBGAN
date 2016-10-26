@@ -177,6 +177,7 @@ def main():
     parser.add_argument('--gpu', '-g', type=int, default=-1, help='negative integer indicates only CPU')
     parser.add_argument('--resume', '-r', type=str, help='trained snapshot')
     parser.add_argument('--out', '-o', default='images/', type=str, help='directory to save images')
+    parser.add_argument('--column', '-c', default='5', type=int, help='number of columns in generated data saved file.')
     parser.add_argument('--loaderjob', type=int, help='loader job for parallel iterator')
     parser.add_argument('--interval', '-i', default=1, type=int, help='frequency of snapshot. larger integer indicates less snapshots.')
     parser.add_argument('--test', type=int, default=-1, help='positive integer indicates debug mode.')
@@ -244,7 +245,7 @@ def main():
 
     trainer.extend(EBGAN_Evaluator(val_iter, trainer.updater.gen, trainer.updater.dis, batchsize=batch_size, device=args.gpu))
 
-    @training.make_extension(trigger=(1, 'epoch'))
+    @training.make_extension(trigger=(args.epoch, 'epoch'))
     def save_dis_image(trainer):
 
         def save_img(x, filename):
@@ -275,12 +276,12 @@ def main():
 
     @training.make_extension(trigger=(1, 'epoch'))
     def save_gen_image(trainer):
-        generated = trainer.updater.gen(bs=100, train=False)
-        _, ax = plt.subplots(10, 10, sharex=True, sharey=True)
-        for i in range(10):
-            for j in range(10):
-                ax[i][j].imshow(imgs[i * 10 + j], 'gray')
-                ax[i][j].set_axis_off()
+        generated = trainer.updater.gen(train=False).data
+        _, ax = plt.subplots(4, 5, sharex=True, sharey=True)
+        for i in range(4):
+            for j in range(5):
+                ax[i,j].imshow(generated[i * 4 + j, 0])
+                ax[i,j].set_axis_off()
         plt.savefig(os.path.join(args.out,  'epoch_'+str(trainer.updater.epoch), 'generated.png'), dpi=600)
         plt.close('all')
 

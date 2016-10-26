@@ -64,8 +64,8 @@ class Generator(chainer.Chain):
         self.z_dim = z_dim
         self.batch_size = batch_size
 
-    def __call__(self, bs=self.batch_size, train=True):
-        z = np.random.uniform(size=(bs, self.z_dim)).astype(np.float32)
+    def __call__(self, train=True):
+        z = np.random.uniform(size=(self.batch_size, self.z_dim)).astype(np.float32)
         if not train:
             z = chainer.Variable(z, volatile='on')
         h1_ = self.fc1(z)
