@@ -18,3 +18,7 @@ split_test.ipynb
 .ipynb_checkpoints/split_test-checkpoint.ipynb
 
 images/
+
+*.dot
+
+result/gen_loss.dot
