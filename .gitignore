@@ -22,3 +22,5 @@ images/
 *.dot
 
 result/gen_loss.dot
+
+net.pyc
