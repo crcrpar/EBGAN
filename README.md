@@ -4,9 +4,9 @@
 ## Ref.
 Zhao, J., Mathieu, M., & LeCun, Y. (2016). Energy-based Generative Adversarial Network, 1–15. Retrieved from http://arxiv.org/abs/1609.03126
 
-## 0. Environment
-- Python 3.5.2
-- chainer==1.16.0
+## 0. Test Environment
+- Python 3.5.2, 2.7.12
+- chainer==1.16.0, 1.17.0
 
 ## 1. Loss Function
 ### 1.1. Discriminator
